@@ -1,4 +1,4 @@
-# sentry-tool
+# sentry-prompt-tool
 
 A command-line tool that fetches Sentry issue data, optionally enriches it
 with per-event detail, and can pipe the collected context into **Claude** to
