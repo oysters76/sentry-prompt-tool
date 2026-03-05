@@ -1,0 +1,163 @@
+# ──────────────────────────────────────────────────────────────────────
+# release.yml  –  Build static binaries for multiple architectures and
+#                 publish a GitHub Release when a vX.Y.Z tag is pushed.
+# ──────────────────────────────────────────────────────────────────────
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]*"   # v1.0.0, v1.2.3-beta, etc.
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  # ── Build static binary for each target ─────────────────────────────
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── x86-64 (native) ────────────────────────────────────────
+          - target: linux-amd64
+            runner: ubuntu-latest
+            cc: gcc
+            arch_packages: ""
+            cross: false
+
+          # ── ARM64 (cross-compiled with musl) ──────────────────────
+          - target: linux-arm64
+            runner: ubuntu-latest
+            cc: aarch64-linux-gnu-gcc
+            arch_packages: >-
+              gcc-aarch64-linux-gnu
+              libcurl4-openssl-dev:arm64
+              libcjson-dev:arm64
+            cross: true
+
+          # ── ARMv7 / Raspberry Pi (cross-compiled) ─────────────────
+          - target: linux-armv7
+            runner: ubuntu-latest
+            cc: arm-linux-gnueabihf-gcc
+            arch_packages: >-
+              gcc-arm-linux-gnueabihf
+              libcurl4-openssl-dev:armhf
+              libcjson-dev:armhf
+            cross: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Enable foreign-arch packages for cross-compilation targets
+      - name: Enable multi-arch (cross targets only)
+        if: matrix.cross
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo dpkg --add-architecture armhf
+          sudo apt-get update
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y \
+            libcurl4-openssl-dev \
+            libcjson-dev \
+            ${{ matrix.arch_packages }}
+
+      - name: Build release binary
+        env:
+          CC: ${{ matrix.cc }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          make CC=${{ matrix.cc }} \
+               CFLAGS="-std=c11 -Wall -Wextra -O2 -DNDEBUG -DVERSION=\\\"${VERSION}\\\""
+
+      - name: Rename binary for upload
+        run: |
+          mv sentry-tool sentry-tool-${{ matrix.target }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentry-tool-${{ matrix.target }}
+          path: sentry-tool-${{ matrix.target }}
+          retention-days: 1
+
+  # ── Create GitHub Release and attach all binaries ───────────────────
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed to generate a changelog
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        working-directory: dist
+        run: |
+          sha256sum sentry-tool-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Generate changelog from git log
+        id: changelog
+        run: |
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREVIOUS_TAG" ]; then
+            CHANGES=$(git log ${PREVIOUS_TAG}..HEAD \
+                        --pretty=format:"- %s (%h)" \
+                        --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          # Write to file to avoid quoting issues
+          echo "$CHANGES" > /tmp/changelog.txt
+          echo "previous_tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "sentry-tool ${{ github.ref_name }}"
+          body: |
+            ## What's Changed
+            $(cat /tmp/changelog.txt)
+
+            ## Installation
+
+            ### Quick install (Linux amd64)
+            ```bash
+            curl -sSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sentry-tool-linux-amd64 \
+              -o sentry-tool && chmod +x sentry-tool
+            ```
+
+            ### Verify checksum
+            ```bash
+            curl -sSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SHA256SUMS.txt | sha256sum --check --ignore-missing
+            ```
+
+            ## Assets
+            | File | Architecture |
+            |------|-------------|
+            | `sentry-tool-linux-amd64` | x86-64 (most servers/desktops) |
+            | `sentry-tool-linux-arm64` | ARM 64-bit (AWS Graviton, Apple M1 Linux VMs) |
+            | `sentry-tool-linux-armv7` | ARM 32-bit (Raspberry Pi) |
+            | `SHA256SUMS.txt` | Checksums for all binaries |
+          files: |
+            dist/sentry-tool-linux-amd64
+            dist/sentry-tool-linux-arm64
+            dist/sentry-tool-linux-armv7
+            dist/SHA256SUMS.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}  # v1.0.0-beta → pre-release
+          generate_release_notes: false

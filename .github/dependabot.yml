@@ -1,0 +1,17 @@
+# ──────────────────────────────────────────────────────────────────────
+# .github/dependabot.yml
+# Keeps GitHub Actions pinned versions up to date automatically.
+# ──────────────────────────────────────────────────────────────────────
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "github-actions"
