@@ -10,6 +10,7 @@
 
 
 /* libcurl write callback – appends received bytes to a Memory buffer. */
+// cppcheck-suppress constParameterCallback
 static size_t write_callback(void *contents, size_t size, size_t nmemb,
                               void *userp)
 {
