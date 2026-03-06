@@ -18,6 +18,7 @@ CJSON_CFLAGS := $(shell pkg-config --cflags libcjson 2>/dev/null)
 CJSON_LIBS   := $(shell pkg-config --libs   libcjson 2>/dev/null || echo -lcjson)
 
 CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -g \
+           -D_POSIX_C_SOURCE=200809L \
            $(CURL_CFLAGS) $(CJSON_CFLAGS)
 LDFLAGS := $(CURL_LIBS) $(CJSON_LIBS)
 

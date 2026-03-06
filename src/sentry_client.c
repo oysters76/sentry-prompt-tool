@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
+
 
 /* libcurl write callback – appends received bytes to a Memory buffer. */
 static size_t write_callback(void *contents, size_t size, size_t nmemb,
