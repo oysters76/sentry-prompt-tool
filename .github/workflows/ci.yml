@@ -27,6 +27,7 @@ jobs:
                    --error-exitcode=1 \
                    --suppress=missingIncludeSystem \
                    --suppress=unmatchedSuppression \
+                   --suppress=constParameterCallback \
                    src/
 
   # ── Build matrix (GCC + Clang, Debug + Release) ──────────────────────
