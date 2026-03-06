@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
@@ -81,6 +83,7 @@ char *build_sentry_event_list_url(const char *org, const char *issue)
         return NULL;
 
     snprintf(url, (size_t)len + 1, tmpl, org, issue);
+    printf("url: %s\n", url);
     return url;
 }
 
@@ -100,6 +103,7 @@ char *build_sentry_event_detail_url(const char *org,
         return NULL;
 
     snprintf(url, (size_t)len + 1, tmpl, org, issue, event_id);
+    printf("url: %s\n", url); 
     return url;
 }
 
@@ -378,55 +382,39 @@ char *build_duplicate_prompt(const char *issue_id,
 
 char *run_claude_prompt(const char *prompt)
 {
-    char tmp_path[] = "/tmp/sentry_claude_XXXXXX";
+  char tmp_path[] = "/tmp/sentry_claude_XXXXXX";
     int  fd         = mkstemp(tmp_path);
     if (fd < 0) {
         perror("mkstemp");
-        return NULL;
+        return "";
     }
 
     FILE *tmp = fdopen(fd, "w");
     if (!tmp) {
         perror("fdopen");
         close(fd);
-        return NULL;
+        return "";
     }
     fputs(prompt, tmp);
     fclose(tmp);
 
-    char command[256];
-    snprintf(command, sizeof(command), "claude < %s", tmp_path);
-
-    FILE *fp = popen(command, "r");
-    remove(tmp_path); 
-
-    if (!fp)
-        return NULL;
-
-    char  *result = malloc(1);
-    size_t size   = 0;
-
-    if (!result) {
-        pclose(fp);
-        return NULL;
-    }
-    result[0] = '\0';
-
-    char buffer[4096];
-    while (fgets(buffer, sizeof(buffer), fp)) {
-        size_t len = strlen(buffer);
-        char  *tmp_buf = realloc(result, size + len + 1);
-        if (!tmp_buf) {
-            free(result);
-            pclose(fp);
-            return NULL;
-        }
-        result = tmp_buf;
-        memcpy(result + size, buffer, len);
-        size          += len;
-        result[size]   = '\0';
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        remove(tmp_path);
+        return "";
     }
 
-    pclose(fp);
-    return result;
+    if (pid == 0) {
+        /* child: exec claude directly, inherits stdin/stdout/stderr */
+        char *const argv[] = { "claude", tmp_path, NULL };
+        execvp("claude", argv);
+        perror("execvp: claude");
+        _exit(1);
+    }
+
+    /* parent: wait for claude to finish */
+    waitpid(pid, NULL, 0);
+    remove(tmp_path);
+    return "success";
 }

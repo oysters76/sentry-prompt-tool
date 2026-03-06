@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     char *all_events = process_event_list(sentry_issue_response,
                                           org, issue_id, token, detail);
     if (all_events && all_events[0] != '\0')
-        printf("%s\n", all_events);
+        printf("\n%s\n", all_events);
 
     if (claude) {
         char *prompt = duplicate
@@ -93,6 +93,7 @@ int main(int argc, char **argv)
         if (!prompt) {
             fprintf(stderr, "Failed to build Claude prompt\n");
         } else {
+          printf("prompt being used: %s\n", prompt);
             char *claude_response = run_claude_prompt(prompt);
             if (claude_response) {
                 printf("Claude response:\n%s\n", claude_response);
