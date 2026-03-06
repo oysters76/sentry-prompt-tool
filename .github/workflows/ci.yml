@@ -2,25 +2,20 @@
 # ci.yml  –  Build & test on every push / pull-request
 # ──────────────────────────────────────────────────────────────────────
 name: CI
-
 on:
   push:
     branches: ["**"]
   pull_request:
     branches: [main, master]
-
 jobs:
   # ── Lint (cppcheck static analysis) ─────────────────────────────────
   lint:
     name: Static analysis (cppcheck)
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install cppcheck
         run: sudo apt-get update && sudo apt-get install -y cppcheck
-
       - name: Run cppcheck
         run: |
           cppcheck --enable=all \
@@ -29,13 +24,11 @@ jobs:
                    --suppress=unmatchedSuppression \
                    --suppress=constParameterCallback \
                    src/
-
   # ── Build matrix (GCC + Clang, Debug + Release) ──────────────────────
   build:
     name: Build (${{ matrix.compiler }}, ${{ matrix.build_type }})
     runs-on: ubuntu-latest
     needs: lint
-
     strategy:
       fail-fast: false
       matrix:
@@ -46,10 +39,8 @@ jobs:
             extra_cflags: "-g -DDEBUG"
           - build_type: release
             extra_cflags: "-O2 -DNDEBUG"
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -57,17 +48,12 @@ jobs:
             libcurl4-openssl-dev \
             libcjson-dev \
             ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
-
       - name: Build
-        env:
-          CC: ${{ matrix.compiler }}
         run: |
           make CC=${{ matrix.compiler }} \
-               CFLAGS="-std=c11 -Wall -Wextra -Wpedantic ${{ matrix.extra_cflags }}"
-
+               EXTRA_CFLAGS="${{ matrix.extra_cflags }}"
       - name: Verify binary exists
         run: test -x ./sentry-tool
-
       - name: Upload build artifact
         if: matrix.compiler == 'gcc' && matrix.build_type == 'release'
         uses: actions/upload-artifact@v4
@@ -75,21 +61,17 @@ jobs:
           name: sentry-tool-linux-amd64-dev
           path: sentry-tool
           retention-days: 7
-
   # ── Compiler warnings as errors (strict) ────────────────────────────
   warnings-clean:
     name: Zero warnings (gcc strict)
     runs-on: ubuntu-latest
     needs: lint
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libcjson-dev
-
       - name: Build with -Werror
         run: |
-          make CFLAGS="-std=c11 -Wall -Wextra -Wpedantic -Werror"
+          make EXTRA_CFLAGS="-Werror"
