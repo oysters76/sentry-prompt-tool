@@ -97,7 +97,7 @@ char *build_sentry_event_detail_url(const char *org,
     int len = snprintf(NULL, 0, tmpl, org, issue, event_id);
     if (len < 0)
         return NULL;
-
+    
     char *url = malloc((size_t)len + 1);
     if (!url)
         return NULL;
@@ -132,7 +132,7 @@ char *http_get_with_token(const char *url, const char *token)
     curl_easy_setopt(curl, CURLOPT_URL,           url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     (void *)&chunk);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     (void *)&chunk); 
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
@@ -407,7 +407,7 @@ char *run_claude_prompt(const char *prompt)
 
     if (pid == 0) {
         /* child: exec claude directly, inherits stdin/stdout/stderr */
-        char *const argv[] = { "claude", tmp_path, NULL };
+        char *const argv[] = { "claude", prompt, NULL };
         execvp("claude", argv);
         perror("execvp: claude");
         _exit(1);
