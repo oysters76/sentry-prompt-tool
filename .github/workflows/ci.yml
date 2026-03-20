@@ -56,7 +56,7 @@ jobs:
         run: test -x ./sentry-tool
       - name: Upload build artifact
         if: matrix.compiler == 'gcc' && matrix.build_type == 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sentry-tool-linux-amd64-dev
           path: sentry-tool
