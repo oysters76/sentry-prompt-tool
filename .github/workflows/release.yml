@@ -50,7 +50,7 @@ jobs:
             cross: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Enable foreign-arch packages for cross-compilation targets
       - name: Enable multi-arch (cross targets only)
@@ -94,7 +94,7 @@ jobs:
     needs: build
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0   # needed to generate a changelog
 
